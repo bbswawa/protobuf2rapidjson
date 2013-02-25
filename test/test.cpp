@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
 
 	Document encoded;
 	//rj::Document::AllocatorType& alloc = reply.GetAllocator();
-	encode_to_json_value(person, &encoded, &encoded.GetAllocator());
+	encode_to_json_doc(person, &encoded);
 	StringBuffer output;
 	PrettyWriter<StringBuffer> writer(output);
 	encoded.Accept(writer);
