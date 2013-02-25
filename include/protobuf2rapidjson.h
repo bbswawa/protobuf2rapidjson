@@ -7,6 +7,7 @@
 // Author: maurizio.monge@gmail.com (Maurizio Monge)
 //  Inspired from pb2json, but using rapidjson and adding support for decoding
 
+#include <iostream>
 #include <rapidjson/document.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/message.h>
@@ -107,9 +108,11 @@ bool decode_repeated_field(const GenericValue<Encoding, Allocator>& array_value,
 	case FieldDescriptor::CPPTYPE_ENUM: 
 		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it) {
 			const Value& value = *it;
-			if(!value.IsInt()) return false;
+			if(!value.IsInt() && !value.IsString()) return false;
 			const EnumDescriptor* edesc = field->enum_type();
-			const EnumValueDescriptor *en = edesc->FindValueByNumber(value.GetInt());
+			const EnumValueDescriptor *en = value.IsInt() ?
+				edesc->FindValueByNumber(value.GetInt()) :
+				edesc->FindValueByName(value.GetString());
 			if(!en)	return false;
 			ref->AddEnum(msg,field,en);
 		}
@@ -166,9 +169,11 @@ bool decode_field(const GenericValue<Encoding, Allocator>& value,
 		break;
 	}
 	case FieldDescriptor::CPPTYPE_ENUM: {
-		if(!value.IsInt()) return false;
+		if(!value.IsInt() && !value.IsString()) return false;
 		const EnumDescriptor* edesc = field->enum_type();
-		const EnumValueDescriptor *en = edesc->FindValueByNumber(value.GetInt());
+		const EnumValueDescriptor *en = value.IsInt() ?
+			edesc->FindValueByNumber(value.GetInt()) :
+			edesc->FindValueByName(value.GetString());
 		if(!en)	return false;
 		ref->SetEnum(msg,field,en);
 		break;

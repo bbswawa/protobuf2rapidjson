@@ -3,6 +3,6 @@
     "name": "Django Freeman",
     "phone": [
            { "number": "12345678", "type": 0 },
-           { "number": "34567890", "type": 1 }
+           { "number": "34567890", "type": "HOME" }
     ]
 }
