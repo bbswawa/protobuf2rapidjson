@@ -7,7 +7,7 @@
 // Author: maurizio.monge@gmail.com (Maurizio Monge)
 //  Inspired from pb2json, but using rapidjson and adding support for decoding
 
-#include <iostream>
+#include <sstream>
 #include <rapidjson/document.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/message.h>
@@ -21,7 +21,8 @@ using namespace google::protobuf;
 
 template <typename Encoding, typename Allocator>
 bool decode_from_json_value(const GenericValue<Encoding, Allocator>& value,
-                            Message *msg);
+                            Message *msg,
+                            std::string *error = NULL);
 
 template <typename Encoding, typename Allocator>
 void encode_to_json_value(const Message& msg,
@@ -32,88 +33,134 @@ template <typename Encoding, typename Allocator>
 void encode_to_json_doc(const Message& msg,
                           GenericDocument<Encoding, Allocator>* value);
 
+std::string itos(int n) {
+	std::ostringstream ss;
+	ss << n;
+	return ss.str();
+}
+
+template <typename Encoding, typename Allocator>
+std::string value_to_string(const GenericValue<Encoding, Allocator>& value) {
+	std::ostringstream ss;
+	if(value.IsInt())
+		ss << value.GetInt();
+	else if(value.IsString())
+		ss << "\"" << value.GetString() << "\"";
+	else
+		ss << "???";
+	return ss.str();
+}
+
+bool set_error(std::string* error, const FieldDescriptor *field, const std::string& msg) {
+	if(error)
+		*error = "/"+field->name()+" ("+msg+")";
+	return false;
+}
+
+bool set_error_array(std::string* error, int i, const FieldDescriptor *field, const std::string& msg) {
+	if(error)
+		*error = "/"+field->name()+"["+itos(i)+"] ("+msg+")";
+	return false;
+}
+
 template <typename Encoding, typename Allocator>
 bool decode_repeated_field(const GenericValue<Encoding, Allocator>& array_value,
                            Message *msg,
                            const Reflection *ref,
-                           const FieldDescriptor *field) {
+                           const FieldDescriptor *field,
+                           std::string *error) {
 	if(!array_value.IsArray())
-		return false;
+		return set_error(error,field,"Expected array");
 
+	int i = 0;
 	switch (field->cpp_type())
 	{
 	case FieldDescriptor::CPPTYPE_DOUBLE:
-		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it) {
+		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it, ++i) {
 			const Value& value = *it;
-			if(!value.IsNumber()) return false;
+			if(!value.IsNumber())
+				return set_error_array(error,i,field,"Expected number");
 			ref->AddDouble(msg,field,value.GetDouble());
 		}
 		break;
 	case FieldDescriptor::CPPTYPE_FLOAT:
-		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it) {
+		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it, ++i) {
 			const Value& value = *it;
-			if(!value.IsNumber()) return false;
+			if(!value.IsNumber())
+				return set_error_array(error,i,field,"Expected number");
 			ref->AddFloat(msg,field,value.GetDouble());
 		}
 		break;
 	case FieldDescriptor::CPPTYPE_INT64:
-		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it) {
+		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it, ++i) {
 			const Value& value = *it;
-			if(!value.IsInt64()) return false;
+			if(!value.IsInt64())
+				return set_error_array(error,i,field,"Expected int64");
 			ref->AddInt64(msg,field,value.GetInt64());
 		}
 		break;
 	case FieldDescriptor::CPPTYPE_UINT64:
-		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it) {
+		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it, ++i) {
 			const Value& value = *it;
-			if(!value.IsUint64()) return false;
+			if(!value.IsUint64())
+				return set_error_array(error,i,field,"Expected uint64");
 			ref->AddUInt64(msg,field,value.GetUint64());
 		}
 		break;
 	case FieldDescriptor::CPPTYPE_INT32:
-		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it) {
+		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it, ++i) {
 			const Value& value = *it;
-			if(!value.IsInt()) return false;
+			if(!value.IsInt())
+				return set_error_array(error,i,field,"Expected int");
 			ref->AddInt32(msg,field,value.GetInt());
 		}
 		break;
 	case FieldDescriptor::CPPTYPE_UINT32:
-		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it) {
+		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it, ++i) {
 			const Value& value = *it;
-			if(!value.IsUint()) return false;
+			if(!value.IsUint())
+				return set_error_array(error,i,field,"Expected uint");
 			ref->AddUInt32(msg,field,value.GetUint());
 		}
 		break;
 	case FieldDescriptor::CPPTYPE_BOOL:
-		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it) {
+		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it, ++i) {
 			const Value& value = *it;
-			if(!value.IsBool()) return false;
+			if(!value.IsBool())
+				return set_error_array(error,i,field,"Expected bool");
 			ref->AddBool(msg,field,value.GetBool());
 		}
 		break;
 	case FieldDescriptor::CPPTYPE_STRING: 
-		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it) {
+		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it, ++i) {
 			const Value& value = *it;
-			if(!value.IsString()) return false;
+			if(!value.IsString())
+				return set_error_array(error,i,field,"Expected string");
 			ref->AddString(msg,field,value.GetString());
 		}
 		break;
 	case FieldDescriptor::CPPTYPE_MESSAGE: 
-		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it) {
+		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it, ++i) {
 			const Value& value = *it;
-			if(!decode_from_json_value(value, ref->AddMessage(msg,field)))
+			if(!decode_from_json_value(value, ref->AddMessage(msg,field), error)) {
+				if(error)
+					*error = "/"+field->name()+"["+itos(i)+"]"+*error;
 				return false;
+			}
 		}
 		break;
 	case FieldDescriptor::CPPTYPE_ENUM: 
-		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it) {
+		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it, ++i) {
 			const Value& value = *it;
-			if(!value.IsInt() && !value.IsString()) return false;
+			if(!value.IsInt() && !value.IsString())
+				return set_error_array(error,i,field,"Expected string or int for enum");
 			const EnumDescriptor* edesc = field->enum_type();
 			const EnumValueDescriptor *en = value.IsInt() ?
 				edesc->FindValueByNumber(value.GetInt()) :
 				edesc->FindValueByName(value.GetString());
-			if(!en)	return false;
+			if(!en)
+				return set_error_array(error,i,field,
+				                       "Invalid value "+value_to_string(value)+" for enum "+edesc->name());
 			ref->AddEnum(msg,field,en);
 		}
 		break;
@@ -127,60 +174,109 @@ template <typename Encoding, typename Allocator>
 bool decode_field(const GenericValue<Encoding, Allocator>& value,
                   Message *msg,
                   const Reflection *ref,
-                  const FieldDescriptor *field) {
+                  const FieldDescriptor *field,
+                  std::string *error) {
 	switch (field->cpp_type())
 	{
 	case FieldDescriptor::CPPTYPE_DOUBLE:
-		if(!value.IsNumber()) return false;
+		if(!value.IsNumber())
+			return set_error(error,field,"Expected number");
 		ref->SetDouble(msg,field,value.GetDouble());
 		break;
 	case FieldDescriptor::CPPTYPE_FLOAT:
-		if(!value.IsNumber()) return false;
+		if(!value.IsNumber())
+			return set_error(error,field,"Expected number");
 		ref->SetFloat(msg,field,value.GetDouble());
 		break;
 	case FieldDescriptor::CPPTYPE_INT64:
-		if(!value.IsInt64()) return false;
+		if(!value.IsInt64())
+			return set_error(error,field,"Expected int64");
 		ref->SetInt64(msg,field,value.GetInt64());
 		break;
 	case FieldDescriptor::CPPTYPE_UINT64:
-		if(!value.IsUint64()) return false;
+		if(!value.IsUint64())
+			return set_error(error,field,"Expected uint64");
 		ref->SetUInt64(msg,field,value.GetUint64());
 		break;
 	case FieldDescriptor::CPPTYPE_INT32:
-		if(!value.IsInt()) return false;
+		if(!value.IsInt())
+			return set_error(error,field,"Expected int");			
 		ref->SetInt32(msg,field,value.GetInt());
 		break;
 	case FieldDescriptor::CPPTYPE_UINT32:
-		if(!value.IsUint()) return false;
+		if(!value.IsUint())
+			return set_error(error,field,"Expected uint");
 		ref->SetUInt32(msg,field,value.GetUint());
 		break;
 	case FieldDescriptor::CPPTYPE_BOOL:
-		if(!value.IsBool()) return false;
+		if(!value.IsBool())
+			return set_error(error,field,"Expected bool");
 		ref->SetBool(msg,field,value.GetBool());
 		break;
 	case FieldDescriptor::CPPTYPE_STRING: {
-		if(!value.IsString()) return false;
+		if(!value.IsString()) 
+			return set_error(error,field,"Expected string");
 		ref->SetString(msg,field,value.GetString());
 		break;
 	}
 	case FieldDescriptor::CPPTYPE_MESSAGE: {
-		if(!decode_from_json_value(value, ref->MutableMessage(msg,field)))
+		if(!decode_from_json_value(value, ref->MutableMessage(msg,field), error)) {
+			if(error)
+				*error = "/"+field->name()+*error;
 			return false;
+		}
 		break;
 	}
 	case FieldDescriptor::CPPTYPE_ENUM: {
-		if(!value.IsInt() && !value.IsString()) return false;
+		if(!value.IsInt() && !value.IsString())
+			return set_error(error,field,"Expected string or int for enum");
 		const EnumDescriptor* edesc = field->enum_type();
 		const EnumValueDescriptor *en = value.IsInt() ?
 			edesc->FindValueByNumber(value.GetInt()) :
 			edesc->FindValueByName(value.GetString());
-		if(!en)	return false;
+		if(!en)
+			return set_error(error,field,"Invalid value "+value_to_string(value)+" for enum "+edesc->name());
 		ref->SetEnum(msg,field,en);
 		break;
 	}
 	default:
 		break;
 	}
+	return true;
+}
+
+template <typename Encoding, typename Allocator>
+bool decode_from_json_value(const GenericValue<Encoding, Allocator>& value,
+                            Message *msg,
+                            std::string *error) {
+
+	const Descriptor *d = msg->GetDescriptor();
+	const Reflection *ref = msg->GetReflection();
+
+	if(!value.IsObject()) {
+		if(error)
+			*error = " (Expected object)";
+		return false;
+	}
+
+	for(Value::ConstMemberIterator it = value.MemberBegin(); it != value.MemberEnd(); ++it) {
+		const FieldDescriptor *field = d->FindFieldByName(it->name.GetString());
+		if(field == NULL) {
+			if(error)
+				*error = std::string(" (No field \"")+it->name.GetString()+"\" in message "+d->name()+")";
+			return false;
+		}
+
+		if(field->is_repeated()) {
+			if(!decode_repeated_field(it->value, msg, ref, field, error))
+				return false;
+		}
+		else {
+			if(!decode_field(it->value, msg, ref, field, error))
+				return false;
+		}
+	}
+
 	return true;
 }
 
@@ -314,36 +410,6 @@ void encode_field(const Message *msg,
 	default:
 		break;
 	}
-}
-
-template <typename Encoding, typename Allocator>
-bool decode_from_json_value(const GenericValue<Encoding, Allocator>& value,
-                            Message *msg) {
-
-	const Descriptor *d = msg->GetDescriptor();
-	if(!d) return false;
-
-	const Reflection *ref = msg->GetReflection();
-	if(!ref) return false;
-
-	if(!value.IsObject())
-		return false;
-
-	for(Value::ConstMemberIterator it = value.MemberBegin(); it != value.MemberEnd(); ++it) {
-		const FieldDescriptor *field = d->FindFieldByName(it->name.GetString());
-		if(field == NULL) return false;
-
-		if(field->is_repeated()) {
-			if(!decode_repeated_field(it->value, msg, ref, field))
-				return false;
-		}
-		else {
-			if(!decode_field(it->value, msg, ref, field))
-				return false;
-		}
-	}
-
-	return true;
 }
 
 template <typename Encoding, typename Allocator>

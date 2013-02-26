@@ -35,7 +35,8 @@ int main(int argc, char *argv[]) {
 
 	string text;
 	TextFormat::PrintToString(person, &text);
-	cout << "Protobuf Text:" << endl;
+	cout << "----------------------------" << endl;
+	cout << "PROTBUF TEXT:" << endl;
 	cout << text << endl;
 
 	Document encoded;
@@ -46,8 +47,33 @@ int main(int argc, char *argv[]) {
 	encoded.Accept(writer);
 	output.Put('\n');
 
-	cout << "Json again:" << endl;
+	cout << "----------------------------" << endl;
+	cout << "BACK TO JSON:" << endl;
 	cout << string(output.GetString(), output.GetString()+output.Size()) << endl;
+
+	//test error reporting
+	string err;
+
+	cout << "----------------------------" << endl;
+	cout << "TESTING ERROR MESSAGES:" << endl;
+
+	document["phone"][1]["type"].SetString("error?!");
+	if(!decode_from_json_value(document, &person, &err))
+		cout << "Message: " << err << endl;
+
+	document["phone"][1].SetObject();
+	Value b("i am not here");
+	document["phone"][1].AddMember("not_existing", document.GetAllocator(), b, document.GetAllocator());
+	if(!decode_from_json_value(document, &person, &err))
+		cout << "Message: " << err << endl;
+
+	document["phone"][1].SetDouble(5);
+	if(!decode_from_json_value(document, &person, &err))
+		cout << "Message: " << err << endl;
+
+	document["phone"].SetDouble(5);
+	if(!decode_from_json_value(document, &person, &err))
+		cout << "Message: " << err << endl;
 
 	return 0;
 }

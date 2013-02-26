@@ -25,8 +25,9 @@ encode_to_json_value(proto_buf_message, &json_doc, &json_doc.GetAllocator());
 /* ... more code ... */
 
 // decode the message proto_buf_message from a json value json_value
-if(!decode_from_json_value(json_value, &proto_buf_message)) {
-		cout << "Decoding error!" << endl;
+string error;
+if(!decode_from_json_value(json_value, &proto_buf_message, &error)) {
+		cout << "Got error: " << error << endl;
 		return -1;
 }
 ```
