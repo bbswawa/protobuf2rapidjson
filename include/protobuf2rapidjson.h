@@ -149,7 +149,7 @@ bool decode_repeated_field(const GenericValue<Encoding, Allocator>& array_value,
 			}
 		}
 		break;
-	case FieldDescriptor::CPPTYPE_ENUM: 
+	case FieldDescriptor::CPPTYPE_ENUM:
 		for(Value::ConstValueIterator it = array_value.Begin(); it != array_value.End(); ++it, ++i) {
 			const Value& value = *it;
 			if(!value.IsInt() && !value.IsString())
@@ -429,8 +429,10 @@ void encode_to_json_value(const Message& msg,
 		Value member_value;
 
 		if(field->is_repeated()) {
-			encode_repeated_field(&msg, ref, field, &member_value, alloc);
-			value->AddMember(field->name().c_str(), *alloc, member_value, *alloc);
+			if(ref->FieldSize(msg,field) > 0) {
+				encode_repeated_field(&msg, ref, field, &member_value, alloc);
+				value->AddMember(field->name().c_str(), *alloc, member_value, *alloc);
+			}
 		}
 		else if(field->is_required() || ref->HasField(msg,field)) {
 			encode_field(&msg, ref, field, &member_value, alloc);
